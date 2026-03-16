@@ -30,3 +30,18 @@ def test_duplicate_keyword_rejected(client):
     client.post("/api/keywords", json={"value": "router"})
     resp = client.post("/api/keywords", json={"value": "router"})
     assert resp.status_code == 409
+
+def test_update_keyword_duplicate_value_rejected(client):
+    client.post("/api/keywords", json={"value": "alpha"})
+    resp = client.post("/api/keywords", json={"value": "beta"})
+    beta_id = resp.json()["id"]
+    resp = client.put(f"/api/keywords/{beta_id}", json={"value": "alpha"})
+    assert resp.status_code == 409
+
+def test_update_nonexistent_keyword(client):
+    resp = client.put("/api/keywords/999", json={"active": False})
+    assert resp.status_code == 404
+
+def test_delete_nonexistent_keyword(client):
+    resp = client.delete("/api/keywords/999")
+    assert resp.status_code == 404
