@@ -1,6 +1,5 @@
 import io
 from docx import Document as DocxDocument
-from docx.oxml.ns import qn
 
 # The wps namespace is not registered in python-docx's nsmap, so use raw Clark notation
 _WPS_TXBX = "{http://schemas.microsoft.com/office/word/2010/wordprocessingShape}txbx"

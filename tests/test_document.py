@@ -1,6 +1,5 @@
 # tests/test_document.py
 import io
-import os
 import pytest
 from docx import Document as DocxDocument
 
