@@ -1,12 +1,17 @@
 # tests/test_models.py
 from datetime import datetime
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from backend.database import Base
 from backend import models
 
 def make_session():
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    @event.listens_for(engine, "connect")
+    def set_pragma(dbapi_conn, _):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
     Base.metadata.create_all(bind=engine)
     Session = sessionmaker(bind=engine)
     return Session()
@@ -95,3 +100,38 @@ def test_scrape_log_model():
     db.add(log)
     db.commit()
     assert log.id is not None
+
+def test_keyword_value_unique():
+    from sqlalchemy.exc import IntegrityError
+    db = make_session()
+    db.add(models.Keyword(value="networking", active=True))
+    db.commit()
+    db.add(models.Keyword(value="networking", active=True))
+    try:
+        db.commit()
+        assert False, "Expected IntegrityError for duplicate keyword value"
+    except IntegrityError:
+        db.rollback()
+
+def test_tender_source_url_unique():
+    from sqlalchemy.exc import IntegrityError
+    db = make_session()
+    portal = models.Portal(name="P", url="http://p.com", enabled=True, requires_auth=False)
+    db.add(portal)
+    db.commit()
+    db.add(models.Tender(
+        portal_id=portal.id, title="T1", source_url="http://p.com/tender/1",
+        matched_keywords="[]", status="new",
+        scraped_at=datetime(2026, 3, 16), last_updated_at=datetime(2026, 3, 16),
+    ))
+    db.commit()
+    db.add(models.Tender(
+        portal_id=portal.id, title="T2", source_url="http://p.com/tender/1",
+        matched_keywords="[]", status="new",
+        scraped_at=datetime(2026, 3, 16), last_updated_at=datetime(2026, 3, 16),
+    ))
+    try:
+        db.commit()
+        assert False, "Expected IntegrityError for duplicate source_url"
+    except IntegrityError:
+        db.rollback()
