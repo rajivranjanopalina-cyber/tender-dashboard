@@ -46,8 +46,8 @@ class Tender(Base):
     matched_keywords: Mapped[str] = mapped_column(Text, default="[]")  # JSON array
     status: Mapped[str] = mapped_column(String(20), default="new")
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    scraped_at: Mapped[str] = mapped_column(String(30), nullable=False)
-    last_updated_at: Mapped[str] = mapped_column(String(30), nullable=False)
+    scraped_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    last_updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     portal: Mapped["Portal"] = relationship("Portal", back_populates="tenders")
     proposals: Mapped[list["Proposal"]] = relationship("Proposal", back_populates="tender")

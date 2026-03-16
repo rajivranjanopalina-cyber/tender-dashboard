@@ -1,4 +1,5 @@
 # tests/test_models.py
+from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from backend.database import Base
@@ -37,8 +38,8 @@ def test_tender_model():
         source_url="http://p.com/t/1",
         matched_keywords='["networking"]',
         status="new",
-        scraped_at="2026-03-16T00:00:00",
-        last_updated_at="2026-03-16T00:00:00",
+        scraped_at=datetime(2026, 3, 16),
+        last_updated_at=datetime(2026, 3, 16),
     )
     db.add(tender)
     db.commit()
@@ -67,7 +68,7 @@ def test_proposal_model():
     tender = models.Tender(
         portal_id=portal.id, title="T", source_url="http://p.com/t/2",
         matched_keywords="[]", status="approved",
-        scraped_at="2026-03-16T00:00:00", last_updated_at="2026-03-16T00:00:00",
+        scraped_at=datetime(2026, 3, 16), last_updated_at=datetime(2026, 3, 16),
     )
     template = models.Template(
         name="T", original_filename="t.docx", file_path="/data/t.docx",
