@@ -14,9 +14,11 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-padding!")
 
 def _make_engine():
     from backend.database import Base
+    # Use a shared-cache named in-memory DB so all connections (including those
+    # created inside the FastAPI TestClient) see the same schema and data.
     engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
+        "sqlite:///file::memory:?cache=shared&uri=true",
+        connect_args={"check_same_thread": False, "uri": True},
     )
     # Apply FK pragma to test engines (mirrors production behaviour)
     @event.listens_for(engine, "connect")
@@ -46,8 +48,12 @@ def db_session(db_engine):
 
 @pytest.fixture(scope="function")
 def client(db_engine):
-    from backend.database import get_db
-    from backend.main import app
+    from backend.database import get_db, Base
+    from backend.main import app  # importing main registers all models to Base
+
+    # Ensure all model tables exist on the test engine (models register to Base
+    # only when backend.main is imported; _make_engine runs create_all too early).
+    Base.metadata.create_all(bind=db_engine)
 
     def override_get_db():
         Session = sessionmaker(bind=db_engine)
