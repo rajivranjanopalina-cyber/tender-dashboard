@@ -1,5 +1,6 @@
 # tests/test_document.py
 import io
+import os
 import pytest
 from docx import Document as DocxDocument
 
@@ -49,3 +50,45 @@ def test_docx_ignores_missing_placeholders(tmp_path):
     doc = DocxDocument(out_path)
     # Unreplaced placeholders left as-is
     assert "{{tender_estimated_value}}" in doc.paragraphs[0].text
+
+
+def test_pdf_fills_acroform_field(tmp_path):
+    from unittest.mock import patch, MagicMock
+    from backend.document.pdf_handler import fill_pdf_template
+
+    out_path = str(tmp_path / "output.pdf")
+
+    with patch("backend.document.pdf_handler.PdfReader") as MockReader, \
+         patch("backend.document.pdf_handler.PdfWriter") as MockWriter:
+
+        mock_reader = MagicMock()
+        mock_reader.get_fields.return_value = {"tender_title": MagicMock()}
+        MockReader.return_value = mock_reader
+
+        mock_writer = MagicMock()
+        mock_writer.pages = [MagicMock()]
+        MockWriter.return_value = mock_writer
+
+        def write_bytes(f):
+            f.write(b"%PDF-1.4 filled")
+        mock_writer.write.side_effect = write_bytes
+
+        fill_pdf_template(b"fake pdf", {"tender_title": "IT Infrastructure"}, out_path)
+
+    assert os.path.exists(out_path)
+    assert os.path.getsize(out_path) > 0
+
+
+def test_pdf_has_no_fields_raises(tmp_path):
+    from unittest.mock import patch, MagicMock
+    from backend.document.pdf_handler import fill_pdf_template, NoAcroFormFieldsError
+
+    out_path = str(tmp_path / "output.pdf")
+
+    with patch("backend.document.pdf_handler.PdfReader") as MockReader:
+        mock_reader = MagicMock()
+        mock_reader.get_fields.return_value = {}  # no fields
+        MockReader.return_value = mock_reader
+
+        with pytest.raises(NoAcroFormFieldsError):
+            fill_pdf_template(b"fake pdf", {"tender_title": "Test"}, out_path)
