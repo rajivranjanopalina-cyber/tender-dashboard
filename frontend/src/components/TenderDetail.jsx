@@ -16,12 +16,12 @@ export default function TenderDetail({ tenderId, onClose }) {
     client.get(`/tenders/${tenderId}`).then(r => {
       setTender(r.data);
       setNotes(r.data.notes || '');
-    });
+    }).catch(e => setError(e.message));
     client.get('/templates').then(r => {
       setTemplates(r.data.items);
       const def = r.data.items.find(t => t.is_default);
       if (def) setSelectedTemplate(String(def.id));
-    });
+    }).catch(() => {});
   }, [tenderId]);
 
   const saveNotes = () => client.put(`/tenders/${tenderId}`, { notes }).then(r => setTender(r.data));
@@ -65,7 +65,7 @@ export default function TenderDetail({ tenderId, onClose }) {
           ['Published', tender.published_date || '—'],
           ['Deadline', tender.deadline || '—'],
           ['Value', tender.estimated_value || '—'],
-          ['Keywords', JSON.parse(tender.matched_keywords || '[]').join(', ')],
+          ['Keywords', (() => { try { return JSON.parse(tender.matched_keywords || '[]').join(', '); } catch { return ''; } })()],
         ].map(([label, val]) => (
           <tr key={label}>
             <td style={{ color: '#888', padding: '4px 0', paddingRight: 12 }}>{label}</td>

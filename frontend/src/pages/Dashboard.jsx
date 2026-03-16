@@ -13,36 +13,46 @@ export default function Dashboard() {
   const PAGE_SIZE = 50;
 
   const load = async () => {
-    const params = { page, page_size: PAGE_SIZE };
-    if (filters.status) params.status = filters.status;
-    if (filters.keyword) params.keyword = filters.keyword;
-    const res = await client.get('/tenders', { params });
-    setTenders(res.data.items);
-    setTotal(res.data.total);
+    try {
+      const params = { page, page_size: PAGE_SIZE };
+      if (filters.status) params.status = filters.status;
+      if (filters.keyword) params.keyword = filters.keyword;
+      const res = await client.get('/tenders', { params });
+      setTenders(res.data.items);
+      setTotal(res.data.total);
+    } catch (e) {
+      console.error('Failed to load tenders:', e.message);
+    }
   };
 
   const loadStats = async () => {
-    const [all, approved, underReview, logs] = await Promise.all([
-      client.get('/tenders', { params: { page_size: 1 } }),
-      client.get('/tenders', { params: { status: 'approved', page_size: 1 } }),
-      client.get('/tenders', { params: { status: 'under_review', page_size: 1 } }),
-      client.get('/scraper/logs', { params: { page_size: 1 } }),
-    ]);
-    const lastRun = logs.data.items[0]?.run_at;
-    let newSinceLast = 0;
-    if (lastRun) {
-      const res = await client.get('/tenders', { params: { scraped_from: lastRun, page_size: 1 } });
-      newSinceLast = res.data.total;
+    try {
+      const [all, approved, underReview, logs] = await Promise.all([
+        client.get('/tenders', { params: { page_size: 1 } }),
+        client.get('/tenders', { params: { status: 'approved', page_size: 1 } }),
+        client.get('/tenders', { params: { status: 'under_review', page_size: 1 } }),
+        client.get('/scraper/logs', { params: { page_size: 1 } }),
+      ]);
+      const lastRun = logs.data.items[0]?.run_at;
+      let newSinceLast = 0;
+      if (lastRun) {
+        const res = await client.get('/tenders', { params: { scraped_from: lastRun, page_size: 1 } });
+        newSinceLast = res.data.total;
+      }
+      setStats({
+        total: all.data.total,
+        newSinceLast,
+        approved: approved.data.total,
+        underReview: underReview.data.total,
+      });
+    } catch (e) {
+      console.error('Failed to load stats:', e.message);
     }
-    setStats({
-      total: all.data.total,
-      newSinceLast,
-      approved: approved.data.total,
-      underReview: underReview.data.total,
-    });
   };
 
-  useEffect(() => { load(); loadStats(); }, [filters, page]);
+  // Stats reflect global counts — only reload on mount, not on every filter/page change
+  useEffect(() => { loadStats(); }, []);
+  useEffect(() => { load(); }, [filters, page]);
 
   const handleApprove = async (id) => {
     await client.put(`/tenders/${id}`, { status: 'approved' });

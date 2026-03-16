@@ -12,14 +12,33 @@ export default function ProposalsPage() {
   const PAGE_SIZE = 50;
 
   const load = async () => {
-    const params = { page, page_size: PAGE_SIZE };
-    if (filter) params.status = filter;
-    const res = await client.get('/proposals', { params });
-    setProposals(res.data.items);
-    setTotal(res.data.total);
+    try {
+      const params = { page, page_size: PAGE_SIZE };
+      if (filter) params.status = filter;
+      const res = await client.get('/proposals', { params });
+      setProposals(res.data.items);
+      setTotal(res.data.total);
+    } catch (e) {
+      console.error('Failed to load proposals:', e.message);
+    }
   };
 
   useEffect(() => { load(); }, [filter, page]);
+
+  const downloadProposal = async (id) => {
+    const res = await fetch(`/api/proposals/${id}/download`);
+    const fallback = res.headers.get('X-Fallback-Format');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fallback === 'docx' ? `proposal_${id}.docx` : `proposal_${id}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    if (fallback === 'docx') {
+      alert('PDF conversion unavailable — downloading as Word document.');
+    }
+  };
 
   const updateStatus = async (id, status) => {
     await client.put(`/proposals/${id}`, { status });
@@ -63,7 +82,7 @@ export default function ProposalsPage() {
                 </select>
               </td>
               <td style={{ padding: '10px 12px' }}>
-                <a href={`/api/proposals/${p.id}/download`} target="_blank" rel="noreferrer" style={{ color: '#a89cf7', marginRight: 12, fontSize: 13 }}>Download</a>
+                <button onClick={() => downloadProposal(p.id)} style={{ color: '#a89cf7', background: 'none', border: 'none', cursor: 'pointer', marginRight: 12, fontSize: 13 }}>Download</button>
                 <button onClick={() => del(p.id)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
               </td>
             </tr>
