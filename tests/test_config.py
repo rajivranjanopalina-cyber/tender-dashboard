@@ -1,26 +1,20 @@
 # tests/test_config.py
 import os
 import pytest
+from pydantic import ValidationError
 
 def test_config_reads_secret_key():
-    # settings is a singleton — test that it reads SECRET_KEY from env
     from backend.config import settings
-    assert settings.secret_key == os.environ["SECRET_KEY"]
+    assert settings.secret_key == "test-secret-key-32-bytes-padding!"
 
-def test_config_default_data_dir():
-    # DATA_DIR is not set in conftest.py — verify the default is /data
-    # Remove it if somehow set, check default
-    saved = os.environ.pop("DATA_DIR", None)
-    try:
-        import importlib
-        import backend.config as cfg_mod
-        importlib.reload(cfg_mod)
-        assert cfg_mod.settings.data_dir == "/data"
-    finally:
-        if saved:
-            os.environ["DATA_DIR"] = saved
-        importlib.reload(cfg_mod)
+def test_config_default_data_dir(monkeypatch):
+    monkeypatch.delenv("DATA_DIR", raising=False)
+    from backend.config import Settings
+    s = Settings(secret_key="any-key")
+    assert s.data_dir == "/data"
 
-def test_config_default_tz():
-    from backend.config import settings
-    assert settings.tz == "Asia/Kolkata"
+def test_config_default_tz(monkeypatch):
+    monkeypatch.delenv("TZ", raising=False)
+    from backend.config import Settings
+    s = Settings(secret_key="any-key")
+    assert s.tz == "Asia/Kolkata"
