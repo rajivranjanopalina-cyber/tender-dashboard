@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # Set env vars BEFORE any backend imports so settings singleton reads them
 os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-padding!")
@@ -17,8 +18,9 @@ def _make_engine():
     # Use a shared-cache named in-memory DB so all connections (including those
     # created inside the FastAPI TestClient) see the same schema and data.
     engine = create_engine(
-        "sqlite:///file::memory:?cache=shared&uri=true",
-        connect_args={"check_same_thread": False, "uri": True},
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     # Apply FK pragma to test engines (mirrors production behaviour)
     @event.listens_for(engine, "connect")
