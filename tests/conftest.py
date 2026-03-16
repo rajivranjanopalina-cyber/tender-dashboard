@@ -1,6 +1,5 @@
 import os
 import pytest
-import tempfile
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
@@ -26,13 +25,12 @@ def _make_engine():
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
     Base.metadata.create_all(bind=engine)
-    return engine
+    return engine, Base  # return Base to avoid re-importing in caller
 
 
 @pytest.fixture(scope="function")
 def db_engine():
-    engine = _make_engine()
-    from backend.database import Base
+    engine, Base = _make_engine()
     yield engine
     Base.metadata.drop_all(bind=engine)
 
@@ -42,6 +40,7 @@ def db_session(db_engine):
     Session = sessionmaker(bind=db_engine)
     session = Session()
     yield session
+    session.rollback()  # prevent state bleed
     session.close()
 
 
