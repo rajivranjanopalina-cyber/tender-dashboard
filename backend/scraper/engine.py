@@ -12,6 +12,8 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
     Writes a ScrapeLog entry to the database.
     """
     portal = db.get(models.Portal, portal_id)
+    if portal is None:
+        raise ValueError(f"Portal {portal_id} not found")
     result = {"tenders_found": 0, "tenders_new": 0, "status": "success", "error_message": None}
 
     try:
@@ -48,6 +50,10 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
             kw.value.lower()
             for kw in db.query(models.Keyword).filter(models.Keyword.active == True).all()
         ]
+
+        if not active_keywords:
+            result["error_message"] = "No active keywords configured — no tenders will be saved"
+            # Don't fail — continue to scrape (tenders_found will still be recorded)
 
         now = datetime.utcnow()
         new_count = 0
@@ -97,10 +103,9 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
                 db.add(tender)
                 new_count += 1
 
-        db.commit()
-        result["tenders_new"] = new_count
         portal.last_scraped_at = now
-        db.commit()
+        db.commit()           # commits tenders AND portal.last_scraped_at atomically
+        result["tenders_new"] = new_count
 
     except Exception as e:
         result["status"] = "failed"
