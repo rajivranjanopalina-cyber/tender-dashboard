@@ -15,8 +15,9 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-32-bytes-padding!")
 
 def _make_engine():
     from backend.database import Base
-    # Use a shared-cache named in-memory DB so all connections (including those
-    # created inside the FastAPI TestClient) see the same schema and data.
+    # StaticPool ensures all connections — including those made by FastAPI TestClient
+    # worker threads — share the exact same underlying DBAPI connection, giving
+    # each test function a fully isolated in-memory database without URI tricks.
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},

@@ -85,8 +85,10 @@ def test_delete_portal_cascades(client, db_session):
     resp = client.delete(f"/api/portals/{portal_id}")
     assert resp.status_code == 204
 
+    # End the session's open transaction so the next read sees the committed state
+    db_session.rollback()
+
     # Verify portal, tender, and proposal are all gone
-    db_session.expire_all()
     assert db_session.get(models.Portal, portal_id) is None
     assert db_session.get(models.Tender, tender_id) is None
     assert db_session.get(models.Proposal, proposal_id) is None
