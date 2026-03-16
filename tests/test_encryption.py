@@ -21,3 +21,9 @@ def test_decrypt_none_returns_none():
 def test_empty_string():
     enc = encrypt_password("")
     assert decrypt_password(enc) == ""
+
+def test_decrypt_invalid_token_raises():
+    import pytest
+    from cryptography.fernet import InvalidToken
+    with pytest.raises(ValueError, match="invalid or key has changed"):
+        decrypt_password("not-a-valid-fernet-token")
