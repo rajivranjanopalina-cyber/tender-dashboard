@@ -11,10 +11,14 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
     Scrape a single portal. Returns dict with tenders_found, tenders_new, status, error_message.
     Writes a ScrapeLog entry to the database.
     """
+    result = {"tenders_found": 0, "tenders_new": 0, "status": "failed", "error_message": None}
+
     portal = db.get(models.Portal, portal_id)
     if portal is None:
-        raise ValueError(f"Portal {portal_id} not found")
-    result = {"tenders_found": 0, "tenders_new": 0, "status": "success", "error_message": None}
+        result["error_message"] = f"Portal {portal_id} not found"
+        return result  # Cannot write ScrapeLog — portal FK would fail
+
+    result["status"] = "success"
 
     try:
         # Auth check
@@ -36,10 +40,10 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
             for _ in range(max_pages - 1):
                 soup = BeautifulSoup(html, "html.parser")
                 next_link = soup.select_one(next_selector)
-                if not next_link or not next_link.get("href"):
+                if not next_link or not next_link.get("href", "").strip():
                     break
                 from urllib.parse import urljoin
-                next_url = urljoin(portal.url, next_link["href"])
+                next_url = urljoin(portal.url, next_link.get("href", "").strip())
                 html = fetch_html(next_url, render_js=render_js)
                 raw_tenders.extend(parse_tenders(html, portal.scrape_config, base_url=portal.url))
 
