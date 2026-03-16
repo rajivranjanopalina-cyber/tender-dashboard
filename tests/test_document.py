@@ -129,36 +129,3 @@ def test_generator_creates_docx_proposal(tmp_path, monkeypatch):
     assert "IT Networking" in text
 
 
-def test_generator_creates_docx_proposal(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    from backend.document.generator import generate_proposal_file
-    from backend import models
-    from datetime import datetime
-
-    # Create a minimal DOCX template
-    content = make_docx_with_placeholders("Tender: {{tender_title}}, Deadline: {{tender_deadline}}")
-    template_path = str(tmp_path / "template.docx")
-    with open(template_path, "wb") as f:
-        f.write(content)
-
-    # Mock ORM objects
-    tender = MagicMock(spec=models.Tender)
-    tender.title = "IT Networking"
-    tender.description = "Upgrade"
-    tender.deadline = "2026-04-30"
-    tender.published_date = "2026-03-01"
-    tender.estimated_value = "₹50 Lakh"
-    tender.source_url = "https://test.gov.in/t/1"
-    tender.portal.name = "Test Portal"
-    tender.portal.url = "https://test.gov.in"
-
-    template = MagicMock(spec=models.Template)
-    template.id = 1
-    template.file_path = template_path
-    template.file_type = "docx"
-
-    out_path = generate_proposal_file(tender=tender, template=template)
-    assert os.path.exists(out_path)
-    doc = DocxDocument(out_path)
-    text = " ".join(p.text for p in doc.paragraphs)
-    assert "IT Networking" in text
