@@ -7,6 +7,15 @@ class NoAcroFormFieldsError(Exception):
     pass
 
 
+def validate_pdf_acroform_fields(template_bytes: bytes) -> None:
+    """Raise NoAcroFormFieldsError if the PDF has no AcroForm fillable fields."""
+    reader = PdfReader(io.BytesIO(template_bytes))
+    if not reader.get_fields():
+        raise NoAcroFormFieldsError(
+            "PDF has no fillable form fields. Use a PDF with AcroForm fields, or upload a DOCX template instead."
+        )
+
+
 def fill_pdf_template(template_bytes: bytes, placeholders: dict[str, str], output_path: str) -> None:
     """
     Fill AcroForm fields in a PDF template using placeholder names as field names.

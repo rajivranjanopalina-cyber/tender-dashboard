@@ -51,17 +51,11 @@ async def upload_template(
 
     # Validate PDF has AcroForm fields
     if ext == "pdf":
+        from backend.document.pdf_handler import NoAcroFormFieldsError, validate_pdf_acroform_fields
         try:
-            from pypdf import PdfReader
-            import io
-            reader = PdfReader(io.BytesIO(content))
-            if not reader.get_fields():
-                raise HTTPException(
-                    status_code=400,
-                    detail="PDF has no fillable form fields. Use a PDF with AcroForm fields, or upload a DOCX template instead."
-                )
-        except HTTPException:
-            raise
+            validate_pdf_acroform_fields(content)
+        except NoAcroFormFieldsError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
         except Exception:
             raise HTTPException(status_code=400, detail="Could not read PDF file.")
 
