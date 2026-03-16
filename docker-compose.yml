@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - tender_data:/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - TZ=${TZ:-Asia/Kolkata}
+    restart: unless-stopped
+
+volumes:
+  tender_data:
