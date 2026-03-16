@@ -34,7 +34,7 @@ def list_proposals(
 ):
     page_size = min(page_size, 200)
     q = db.query(models.Proposal)
-    if tender_id:
+    if tender_id is not None:
         q = q.filter(models.Proposal.tender_id == tender_id)
     if status:
         q = q.filter(models.Proposal.status == status)

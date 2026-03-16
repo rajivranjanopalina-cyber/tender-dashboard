@@ -69,6 +69,25 @@ def test_delete_tender_no_proposals(client, db_session):
     resp = client.delete(f"/api/tenders/{tender.id}")
     assert resp.status_code == 204
 
+def test_list_tenders_filter_keyword_case_insensitive(client, db_session):
+    from backend import models
+    portal_id = _create_portal(client)
+    # Store tender with mixed-case keyword
+    tender = models.Tender(
+        portal_id=portal_id, title="Network Tender",
+        source_url="https://t.com/ci1",
+        matched_keywords='["Networking"]',  # capital N
+        status="new", scraped_at=datetime.utcnow(), last_updated_at=datetime.utcnow(),
+    )
+    db_session.add(tender)
+    db_session.commit()
+    # Query with lowercase — should still match
+    resp = client.get("/api/tenders?keyword=networking")
+    assert resp.json()["total"] == 1
+    # Query with uppercase — should also match
+    resp = client.get("/api/tenders?keyword=NETWORKING")
+    assert resp.json()["total"] == 1
+
 def test_delete_tender_with_proposals_blocked(client, db_session):
     from backend import models
     portal_id = _create_portal(client)

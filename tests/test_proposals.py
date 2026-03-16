@@ -44,9 +44,12 @@ def test_duplicate_proposal_rejected(client, db_session, tmp_path, monkeypatch):
 
 def test_delete_proposal(client, db_session, tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    monkeypatch.setattr("backend.document.generator.generate_proposal_file", lambda *a, **kw: str(tmp_path / "p.docx"))
+    proposal_file = tmp_path / "p.docx"
+    proposal_file.write_bytes(b"proposal content")  # create actual file
+    monkeypatch.setattr("backend.document.generator.generate_proposal_file", lambda *a, **kw: str(proposal_file))
     tender, template = _setup(db_session)
     resp = client.post("/api/proposals", json={"tender_id": tender.id, "template_id": template.id})
     proposal_id = resp.json()["id"]
     resp = client.delete(f"/api/proposals/{proposal_id}")
     assert resp.status_code == 204
+    assert not proposal_file.exists()  # file was deleted from disk

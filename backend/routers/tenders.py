@@ -43,7 +43,7 @@ def list_tenders(
 ):
     page_size = min(page_size, 200)
     q = db.query(models.Tender)
-    if portal_id:
+    if portal_id is not None:
         q = q.filter(models.Tender.portal_id == portal_id)
     if status:
         q = q.filter(models.Tender.status == status)
