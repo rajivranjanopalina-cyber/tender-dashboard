@@ -1,4 +1,5 @@
 import os
+import sys
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
@@ -10,7 +11,9 @@ def _get_database_url() -> str:
         os.makedirs(data_dir, exist_ok=True)
     except OSError:
         # Fallback for environments where /data is not writable (e.g., dev/test host)
-        data_dir = tempfile.mkdtemp(prefix="tender_")
+        tmp_dir = tempfile.mkdtemp(prefix="tender_")
+        print(f"WARNING: DATA_DIR '{data_dir}' is not writable. Using temporary directory: {tmp_dir}", file=sys.stderr)
+        data_dir = tmp_dir
     return f"sqlite:///{data_dir}/tender.db"
 
 
