@@ -233,6 +233,7 @@ BLOB_READ_WRITE_TOKEN=vercel-blob-token
 COMPANY_NAME=Your Company Name
 COMPANY_ADDRESS=Your Company Address
 COMPANY_CONTACT=contact@company.com
+EXTERNAL_RENDERER_URL=
 TZ=Asia/Kolkata
 ```
 
@@ -587,11 +588,13 @@ def require_auth(request: Request) -> dict:
     FastAPI dependency that validates JWT from Authorization header.
     Also accepts X-Scrape-Token header for cron-triggered scrape requests.
     """
-    # Allow scrape token auth (for GitHub Actions cron)
+    # Allow scrape token auth ONLY for scraper endpoints (GitHub Actions cron)
     scrape_token = request.headers.get("X-Scrape-Token", "")
     expected_scrape = os.environ.get("SCRAPE_SECRET", "")
     if scrape_token and expected_scrape and scrape_token == expected_scrape:
-        return {"auth": "scrape_token"}
+        if "/scraper/" in str(request.url.path):
+            return {"auth": "scrape_token"}
+        # Scrape token not valid for non-scraper endpoints — fall through to JWT check
 
     # JWT auth
     auth_header = request.headers.get("Authorization", "")
@@ -686,7 +689,7 @@ def test_protected_endpoint_with_valid_token(client):
 Run: `pytest tests/test_auth_router.py -v`
 Expected: FAIL — auth router not mounted yet
 
-- [ ] **Step 5: Update backend/main.py to mount auth router and add auth dependency**
+- [ ] **Step 6: Update backend/main.py to mount auth router and add auth dependency**
 
 Replace full contents of `backend/main.py`:
 
@@ -708,6 +711,7 @@ app = FastAPI(title="Tender Dashboard", lifespan=lifespan)
 
 # Public routes (no auth)
 app.include_router(auth.router, prefix="/api", tags=["auth"])
+app.include_router(health.router, prefix="/api", tags=["health"])
 
 # Protected routes (require JWT)
 protected = [
@@ -723,9 +727,7 @@ for router, prefix, tags in protected:
     app.include_router(router, prefix=prefix, tags=tags, dependencies=[Depends(require_auth)])
 ```
 
-**IMPORTANT:** Steps 5 and 6 must be executed together — Step 5 imports `health` which is created in Step 6. Create the health router file FIRST, then replace main.py.
-
-- [ ] **Step 6: Create backend/routers/health.py (do this BEFORE Step 5)**
+- [ ] **Step 5: Create backend/routers/health.py (must be done before Step 6)**
 
 ```python
 from fastapi import APIRouter
@@ -738,15 +740,7 @@ def health_check():
     return {"status": "ok"}
 ```
 
-- [ ] **Step 7: Add health router to main.py**
-
-Add to the public routes section (after auth router):
-
-```python
-app.include_router(health.router, prefix="/api", tags=["health"])
-```
-
-- [ ] **Step 8: Run tests**
+- [ ] **Step 7: Run tests**
 
 Run: `pytest tests/test_auth_router.py -v`
 Expected: PASS
@@ -1237,14 +1231,8 @@ from backend.schemas import ScrapeRunRequest, ScrapeLogOut, PaginatedResponse
 
 router = APIRouter()
 
-
-def _verify_scrape_token(request: Request):
-    """Verify X-Scrape-Token header for cron-triggered scrapes."""
-    token = request.headers.get("X-Scrape-Token", "")
-    expected = os.environ.get("SCRAPE_SECRET", "")
-    if token and token == expected:
-        return True
-    return False
+# Note: Scrape token auth is handled by require_auth in dependencies.py
+# which checks X-Scrape-Token header for /scraper/ paths.
 
 
 @router.get("/status")
@@ -1509,28 +1497,36 @@ def migrate(db_path: str):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 
+    # Detect column name (file_path or blob_url depending on whether schema migration ran)
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(templates)").fetchall()]
+    url_col = "blob_url" if "blob_url" in cols else "file_path"
+
     # Migrate templates
-    templates = conn.execute("SELECT id, file_path, original_filename FROM templates WHERE file_path NOT LIKE 'http%'").fetchall()
+    templates = conn.execute(f"SELECT id, {url_col}, original_filename FROM templates WHERE {url_col} NOT LIKE 'http%'").fetchall()
     for t in templates:
-        if not os.path.exists(t["file_path"]):
-            print(f"  SKIP template {t['id']}: file not found at {t['file_path']}")
+        if not os.path.exists(t[url_col]):
+            print(f"  SKIP template {t['id']}: file not found at {t[url_col]}")
             continue
-        with open(t["file_path"], "rb") as f:
+        with open(t[url_col], "rb") as f:
             content = f.read()
         blob_url = upload_blob(content, f"templates/{t['original_filename']}")
-        conn.execute("UPDATE templates SET file_path = ? WHERE id = ?", (blob_url, t["id"]))
+        conn.execute(f"UPDATE templates SET {url_col} = ? WHERE id = ?", (blob_url, t["id"]))
         print(f"  OK template {t['id']} -> {blob_url}")
 
+    # Detect column name for proposals
+    pcols = [row[1] for row in conn.execute("PRAGMA table_info(proposals)").fetchall()]
+    purl_col = "blob_url" if "blob_url" in pcols else "file_path"
+
     # Migrate proposals
-    proposals = conn.execute("SELECT id, file_path FROM proposals WHERE file_path NOT LIKE 'http%'").fetchall()
+    proposals = conn.execute(f"SELECT id, {purl_col} FROM proposals WHERE {purl_col} NOT LIKE 'http%'").fetchall()
     for p in proposals:
-        if not os.path.exists(p["file_path"]):
-            print(f"  SKIP proposal {p['id']}: file not found at {p['file_path']}")
+        if not os.path.exists(p[purl_col]):
+            print(f"  SKIP proposal {p['id']}: file not found at {p[purl_col]}")
             continue
-        with open(p["file_path"], "rb") as f:
+        with open(p[purl_col], "rb") as f:
             content = f.read()
         blob_url = upload_blob(content, f"proposals/proposal_{p['id']}.docx")
-        conn.execute("UPDATE proposals SET file_path = ? WHERE id = ?", (blob_url, p["id"]))
+        conn.execute(f"UPDATE proposals SET {purl_col} = ? WHERE id = ?", (blob_url, p["id"]))
         print(f"  OK proposal {p['id']} -> {blob_url}")
 
     conn.commit()
