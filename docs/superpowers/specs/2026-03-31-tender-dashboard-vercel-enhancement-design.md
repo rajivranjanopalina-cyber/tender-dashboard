@@ -74,7 +74,8 @@ tender-dashboard/
 │   ├── templates.py        # Template upload/download
 │   ├── proposals.py        # Proposal generation/lifecycle
 │   ├── scrape.py           # Manual trigger + cron endpoint
-│   └── auth.py             # Password verification + JWT issuance
+│   ├── auth.py             # Password verification + JWT issuance
+│   └── health.py           # Health check (Turso + Blob connectivity)
 ├── frontend/               # React SPA (Vite build)
 │   └── src/
 │       ├── pages/          # Dashboard, Scraper, Keywords, Templates, Proposals
@@ -183,7 +184,7 @@ The scraper is rearchitected for Vercel's 10-second function timeout (Hobby plan
 - **Pagination limit:** max 3 pages per scrape invocation to avoid timeout; remaining pages scraped on next run
 - **Failure handling:** each portal scrape writes its own ScrapeLog entry. If a portal fails, it logs the error and does not affect other portals
 - **Retry:** no automatic retry; failed portals are scraped again on next cron run. Users can manually re-trigger from the dashboard
-- **Concurrency:** fan-out fires up to 10 concurrent portal scrapes. Vercel Hobby allows ~10 concurrent function executions; if more portals exist, they are batched
+- **Concurrency:** fan-out fires up to 10 concurrent portal scrapes via `asyncio.gather` (or sequential `fetch` calls). If more than 10 active portals exist, process in sequential batches of 10 with no delay between batches
 - **Self-invocation URL:** fan-out uses `VERCEL_URL` env var (auto-set by Vercel) to construct the URL for per-portal invocations: `https://{VERCEL_URL}/api/scrape?portal_id={id}`
 
 ### Security
@@ -459,7 +460,7 @@ Vercel Blob free tier is 100MB. To prevent exhaustion:
 - Template uploads are limited to 5MB each
 - Generated proposals are typically small (under 1MB)
 - At ~100 templates + ~500 proposals, storage is well within limits
-- If storage approaches 80%, display a warning in the Templates/Proposals UI
+- If storage approaches 80%, display a warning in the Templates/Proposals UI (calculate usage by summing file sizes stored in DB records, since Vercel Blob free tier may not expose a usage API)
 - Future: add a cleanup option to delete old draft proposals
 
 ---
