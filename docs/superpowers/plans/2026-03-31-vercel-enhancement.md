@@ -689,6 +689,19 @@ def test_protected_endpoint_with_valid_token(client):
 Run: `pytest tests/test_auth_router.py -v`
 Expected: FAIL — auth router not mounted yet
 
+- [ ] **Step 5: Create backend/routers/health.py**
+
+```python
+from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.get("/health")
+def health_check():
+    return {"status": "ok"}
+```
+
 - [ ] **Step 6: Update backend/main.py to mount auth router and add auth dependency**
 
 Replace full contents of `backend/main.py`:
@@ -725,19 +738,6 @@ protected = [
 
 for router, prefix, tags in protected:
     app.include_router(router, prefix=prefix, tags=tags, dependencies=[Depends(require_auth)])
-```
-
-- [ ] **Step 5: Create backend/routers/health.py (must be done before Step 6)**
-
-```python
-from fastapi import APIRouter
-
-router = APIRouter()
-
-
-@router.get("/health")
-def health_check():
-    return {"status": "ok"}
 ```
 
 - [ ] **Step 7: Run tests**
