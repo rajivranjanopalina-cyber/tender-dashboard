@@ -5,6 +5,8 @@ from backend import models
 from backend.scraper.fetcher import fetch_html
 from backend.scraper.parser import parse_tenders
 
+MAX_PAGES = 3
+
 
 def scrape_portal(portal_id: int, db: Session) -> dict:
     """
@@ -26,26 +28,27 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
             raise ValueError("Auth required but credentials not configured")
 
         config = json.loads(portal.scrape_config or "{}")
-        render_js = config.get("render_js", False)
+        renderer = config.get("renderer", "default")
 
-        html = fetch_html(portal.url, render_js=render_js)
+        html = fetch_html(portal.url, renderer=renderer, timeout=8)
         raw_tenders = parse_tenders(html, portal.scrape_config or "{}", base_url=portal.url)
 
         # Handle pagination
         pagination = config.get("pagination", {})
         if pagination.get("type") == "next_button":
             from bs4 import BeautifulSoup
-            max_pages = pagination.get("max_pages", 10)
+            from urllib.parse import urljoin
             next_selector = pagination.get("selector", "")
-            for _ in range(max_pages - 1):
+            page_count = 1
+            while page_count < MAX_PAGES:
                 soup = BeautifulSoup(html, "html.parser")
                 next_link = soup.select_one(next_selector)
                 if not next_link or not next_link.get("href", "").strip():
                     break
-                from urllib.parse import urljoin
                 next_url = urljoin(portal.url, next_link.get("href", "").strip())
-                html = fetch_html(next_url, render_js=render_js)
+                html = fetch_html(next_url, renderer=renderer, timeout=8)
                 raw_tenders.extend(parse_tenders(html, portal.scrape_config, base_url=portal.url))
+                page_count += 1
 
         result["tenders_found"] = len(raw_tenders)
 
