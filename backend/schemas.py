@@ -97,6 +97,7 @@ class TemplateOut(BaseModel):
     file_type: str
     sha256: str
     is_default: bool
+    blob_url: str
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -117,7 +118,7 @@ class ProposalOut(BaseModel):
     tender_title: str
     template_id: Optional[int]
     template_name: Optional[str]
-    file_path: str
+    blob_url: str
     status: str
     created_at: datetime
     updated_at: datetime

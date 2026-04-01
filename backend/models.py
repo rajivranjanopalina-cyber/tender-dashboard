@@ -60,7 +60,7 @@ class Template(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_path: Mapped[str] = mapped_column(Text, nullable=False)
+    blob_url: Mapped[str] = mapped_column(Text, nullable=False)
     file_type: Mapped[str] = mapped_column(String(10), nullable=False)  # pdf | docx
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -75,7 +75,7 @@ class Proposal(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tender_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenders.id"), nullable=False)
     template_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("templates.id"), nullable=True)
-    file_path: Mapped[str] = mapped_column(Text, nullable=False)
+    blob_url: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), onupdate=func.now())
