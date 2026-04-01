@@ -12,6 +12,11 @@
       "config": { "maxLambdaSize": "50mb" }
     },
     {
+      "src": "api/test.py",
+      "use": "@vercel/python",
+      "config": { "maxLambdaSize": "50mb" }
+    },
+    {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": { "distDir": "dist" }
@@ -19,6 +24,7 @@
   ],
   "rewrites": [
     { "source": "/api/debug", "destination": "/api/debug.py" },
+    { "source": "/api/test", "destination": "/api/test.py" },
     { "source": "/api/(.*)", "destination": "/api/index.py" },
     { "source": "/(.*)", "destination": "/frontend/$1" }
   ]
