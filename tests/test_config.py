@@ -1,20 +1,22 @@
-# tests/test_config.py
 import os
 import pytest
-from pydantic import ValidationError
 
-def test_config_reads_secret_key():
-    from backend.config import settings
-    assert settings.secret_key == "test-secret-key-32-bytes-padding!"
 
-def test_config_default_data_dir(monkeypatch):
-    monkeypatch.delenv("DATA_DIR", raising=False)
-    from backend.config import Settings
-    s = Settings(secret_key="any-key")
-    assert s.data_dir == "/data"
+def test_settings_loads_turso_vars(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "test-secret")
+    monkeypatch.setenv("TURSO_DATABASE_URL", "libsql://test.turso.io")
+    monkeypatch.setenv("TURSO_AUTH_TOKEN", "test-token")
+    monkeypatch.setenv("JWT_SECRET", "jwt-test-secret")
+    monkeypatch.setenv("DASHBOARD_PASSWORD_HASH", "$2b$12$fakehash")
+    monkeypatch.setenv("SCRAPE_SECRET", "scrape-test-secret")
 
-def test_config_default_tz(monkeypatch):
-    monkeypatch.delenv("TZ", raising=False)
-    from backend.config import Settings
-    s = Settings(secret_key="any-key")
-    assert s.tz == "Asia/Kolkata"
+    import importlib
+    import backend.config
+    importlib.reload(backend.config)
+    s = backend.config.Settings()
+
+    assert s.turso_database_url == "libsql://test.turso.io"
+    assert s.turso_auth_token == "test-token"
+    assert s.jwt_secret == "jwt-test-secret"
+    assert s.dashboard_password_hash == "$2b$12$fakehash"
+    assert s.scrape_secret == "scrape-test-secret"
