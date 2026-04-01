@@ -1,35 +1,43 @@
 import os
-import sys
+import tempfile
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 
 def _get_database_url() -> str:
-    import tempfile
-    data_dir = os.environ.get("DATA_DIR", "/data")
-    try:
-        os.makedirs(data_dir, exist_ok=True)
-    except OSError:
-        # Fallback for environments where /data is not writable (e.g., dev/test host)
-        tmp_dir = tempfile.mkdtemp(prefix="tender_")
-        print(f"WARNING: DATA_DIR '{data_dir}' is not writable. Using temporary directory: {tmp_dir}", file=sys.stderr)
-        data_dir = tmp_dir
+    """Use Turso if configured, otherwise fall back to local SQLite."""
+    turso_url = os.environ.get("TURSO_DATABASE_URL", "")
+    turso_token = os.environ.get("TURSO_AUTH_TOKEN", "")
+
+    if turso_url and turso_token:
+        # turso_url is like "libsql://your-db.turso.io"
+        # sqlalchemy-libsql expects "sqlite+libsql://your-db.turso.io?authToken=...&secure=true"
+        host = turso_url.replace("libsql://", "").replace("https://", "")
+        return f"sqlite+libsql://{host}?authToken={turso_token}&secure=true"
+
+    # Fallback to SQLite for local dev/testing
+    data_dir = os.environ.get("DATA_DIR", tempfile.mkdtemp(prefix="tender_"))
+    os.makedirs(data_dir, exist_ok=True)
     return f"sqlite:///{data_dir}/tender.db"
 
 
-engine = create_engine(
-    _get_database_url(),
-    connect_args={"check_same_thread": False},
-)
+def _create_engine():
+    url = _get_database_url()
+    if url.startswith("sqlite+libsql"):
+        return create_engine(url)
+    else:
+        eng = create_engine(url, connect_args={"check_same_thread": False})
+
+        @event.listens_for(eng, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+        return eng
 
 
-@event.listens_for(engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
-
-
+engine = _create_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
