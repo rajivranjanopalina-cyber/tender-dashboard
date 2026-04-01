@@ -1,25 +1,13 @@
 import hashlib
-import os
-import shutil
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend import models
 from backend.schemas import TemplateOut, TemplateUpdate, PaginatedResponse
+from backend.blob_storage import upload_blob, download_blob, delete_blob
 
 router = APIRouter()
-
-
-def _templates_dir() -> str:
-    """Resolve lazily — read DATA_DIR from env directly so test monkeypatching works."""
-    d = os.path.join(os.environ.get("DATA_DIR", "/data"), "templates")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
-def _sha256_of_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -43,35 +31,30 @@ async def upload_template(
 ):
     filename = file.filename or "template"
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if ext not in ("pdf", "docx"):
-        raise HTTPException(status_code=400, detail="Only PDF and DOCX files are supported")
+    if ext not in ("docx",):
+        raise HTTPException(status_code=400, detail="Only DOCX files are supported")
 
     content = await file.read()
-    sha = _sha256_of_bytes(content)
+    sha_hash = hashlib.sha256(content).hexdigest()
 
-    # Validate PDF has AcroForm fields
-    if ext == "pdf":
-        from backend.document.pdf_handler import NoAcroFormFieldsError, validate_pdf_acroform_fields
-        try:
-            validate_pdf_acroform_fields(content)
-        except NoAcroFormFieldsError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
-        except Exception:
-            raise HTTPException(status_code=400, detail="Could not read PDF file.")
+    # Check for duplicate
+    existing = db.query(models.Template).filter(models.Template.sha256 == sha_hash).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Template already uploaded")
 
-    save_path = os.path.join(_templates_dir(), f"{sha}.{ext}")
-    try:
-        with open(save_path, "wb") as f:
-            f.write(content)
-    except OSError:
-        raise HTTPException(status_code=507, detail="Insufficient storage. Free up space on the data volume.")
+    blob_url = upload_blob(content, f"templates/{sha_hash}_{filename}")
 
     if is_default:
         db.query(models.Template).filter(models.Template.is_default == True).update({"is_default": False})
 
     template = models.Template(
-        name=name, description=description, original_filename=filename,
-        file_path=save_path, file_type=ext, sha256=sha, is_default=is_default,
+        name=name,
+        description=description,
+        original_filename=filename,
+        blob_url=blob_url,
+        file_type="docx",
+        sha256=sha_hash,
+        is_default=is_default,
     )
     db.add(template)
     db.commit()
@@ -116,9 +99,11 @@ def delete_template(template_id: int, db: Session = Depends(get_db)):
         models.Proposal.status.in_(["won", "lost"]),
     ).update({"template_id": None})
 
-    # Delete file from disk
-    if os.path.exists(template.file_path):
-        os.remove(template.file_path)
+    # Delete from Vercel Blob
+    try:
+        delete_blob(template.blob_url)
+    except Exception:
+        pass  # Best-effort: don't block DB delete if blob deletion fails
 
     db.delete(template)
     db.commit()
@@ -129,6 +114,12 @@ def download_template(template_id: int, db: Session = Depends(get_db)):
     template = db.get(models.Template, template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    if not os.path.exists(template.file_path):
-        raise HTTPException(status_code=404, detail="Template file not found on disk")
-    return FileResponse(template.file_path, filename=template.original_filename)
+    try:
+        content = download_blob(template.blob_url)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Template file not found in storage")
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{template.original_filename}"'},
+    )

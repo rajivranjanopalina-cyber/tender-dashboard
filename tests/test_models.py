@@ -64,7 +64,7 @@ def test_template_model():
         t = models.Template(
             name="Standard Proposal",
             original_filename="proposal.docx",
-            file_path="/data/templates/proposal.docx",
+            blob_url="https://blob.vercel-storage.com/templates/proposal.docx",
             file_type="docx",
             sha256="abc123",
             is_default=True,
@@ -84,14 +84,15 @@ def test_proposal_model():
             scraped_at=datetime(2026, 3, 16), last_updated_at=datetime(2026, 3, 16),
         )
         template = models.Template(
-            name="T", original_filename="t.docx", file_path="/data/t.docx",
+            name="T", original_filename="t.docx",
+            blob_url="https://blob.vercel-storage.com/templates/t.docx",
             file_type="docx", sha256="xyz", is_default=False,
         )
         db.add_all([tender, template])
         db.commit()
         proposal = models.Proposal(
             tender_id=tender.id, template_id=template.id,
-            file_path="/data/proposals/p.pdf", status="draft",
+            blob_url="https://blob.vercel-storage.com/proposals/p.docx", status="draft",
         )
         db.add(proposal)
         db.commit()

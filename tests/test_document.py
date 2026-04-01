@@ -3,7 +3,7 @@ import io
 import os
 import pytest
 from docx import Document as DocxDocument
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def make_docx_with_placeholders(text: str) -> bytes:
@@ -14,20 +14,19 @@ def make_docx_with_placeholders(text: str) -> bytes:
     return buf.getvalue()
 
 
-def test_docx_replaces_placeholder_in_paragraph(tmp_path):
+def test_docx_replaces_placeholder_in_paragraph():
     from backend.document.docx_handler import fill_docx_template
     content = make_docx_with_placeholders("Dear Team, re: {{tender_title}} by {{tender_deadline}}")
     placeholders = {"tender_title": "IT Infrastructure", "tender_deadline": "2026-04-30"}
-    out_path = str(tmp_path / "output.docx")
-    fill_docx_template(content, placeholders, out_path)
-    doc = DocxDocument(out_path)
+    result_bytes = fill_docx_template(content, placeholders)
+    doc = DocxDocument(io.BytesIO(result_bytes))
     full_text = " ".join(p.text for p in doc.paragraphs)
     assert "IT Infrastructure" in full_text
     assert "2026-04-30" in full_text
     assert "{{" not in full_text
 
 
-def test_docx_replaces_placeholder_in_table(tmp_path):
+def test_docx_replaces_placeholder_in_table():
     from backend.document.docx_handler import fill_docx_template
     doc = DocxDocument()
     table = doc.add_table(rows=1, cols=2)
@@ -36,96 +35,53 @@ def test_docx_replaces_placeholder_in_table(tmp_path):
     buf = io.BytesIO()
     doc.save(buf)
     placeholders = {"tender_title": "Cloud Migration"}
-    out_path = str(tmp_path / "output.docx")
-    fill_docx_template(buf.getvalue(), placeholders, out_path)
-    doc2 = DocxDocument(out_path)
+    result_bytes = fill_docx_template(buf.getvalue(), placeholders)
+    doc2 = DocxDocument(io.BytesIO(result_bytes))
     cell_text = doc2.tables[0].cell(0, 1).text
     assert cell_text == "Cloud Migration"
 
 
-def test_docx_ignores_missing_placeholders(tmp_path):
+def test_docx_ignores_missing_placeholders():
     from backend.document.docx_handler import fill_docx_template
     content = make_docx_with_placeholders("Value: {{tender_estimated_value}}")
-    out_path = str(tmp_path / "output.docx")
-    fill_docx_template(content, {}, out_path)  # No placeholders provided
-    doc = DocxDocument(out_path)
+    result_bytes = fill_docx_template(content, {})  # No placeholders provided
+    doc = DocxDocument(io.BytesIO(result_bytes))
     # Unreplaced placeholders left as-is
     assert "{{tender_estimated_value}}" in doc.paragraphs[0].text
 
 
-def test_pdf_fills_acroform_field(tmp_path):
-    from unittest.mock import patch, MagicMock
-    from backend.document.pdf_handler import fill_pdf_template
-
-    out_path = str(tmp_path / "output.pdf")
-
-    with patch("backend.document.pdf_handler.PdfReader") as MockReader, \
-         patch("backend.document.pdf_handler.PdfWriter") as MockWriter:
-
-        mock_reader = MagicMock()
-        mock_reader.get_fields.return_value = {"tender_title": MagicMock()}
-        MockReader.return_value = mock_reader
-
-        mock_writer = MagicMock()
-        mock_writer.pages = [MagicMock()]
-        MockWriter.return_value = mock_writer
-
-        def write_bytes(f):
-            f.write(b"%PDF-1.4 filled")
-        mock_writer.write.side_effect = write_bytes
-
-        fill_pdf_template(b"fake pdf", {"tender_title": "IT Infrastructure"}, out_path)
-
-    assert os.path.exists(out_path)
-    assert os.path.getsize(out_path) > 0
-
-
-def test_pdf_has_no_fields_raises(tmp_path):
-    from unittest.mock import patch, MagicMock
-    from backend.document.pdf_handler import fill_pdf_template, NoAcroFormFieldsError
-
-    out_path = str(tmp_path / "output.pdf")
-
-    with patch("backend.document.pdf_handler.PdfReader") as MockReader:
-        mock_reader = MagicMock()
-        mock_reader.get_fields.return_value = {}  # no fields
-        MockReader.return_value = mock_reader
-
-        with pytest.raises(NoAcroFormFieldsError):
-            fill_pdf_template(b"fake pdf", {"tender_title": "Test"}, out_path)
-
-
-def test_generator_creates_docx_proposal(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
-    from backend.document.generator import generate_proposal_file
+def test_generator_creates_docx_proposal():
+    from backend.document.generator import generate_proposal
     from backend import models
 
-    # Create a minimal DOCX template
+    # Create a minimal DOCX template as bytes
     content = make_docx_with_placeholders("Tender: {{tender_title}}, Deadline: {{tender_deadline}}")
-    template_path = str(tmp_path / "template.docx")
-    with open(template_path, "wb") as f:
-        f.write(content)
 
     # Mock ORM objects
     tender = MagicMock(spec=models.Tender)
+    tender.id = 1
     tender.title = "IT Networking"
     tender.description = "Upgrade"
     tender.deadline = "2026-04-30"
     tender.published_date = "2026-03-01"
-    tender.estimated_value = "₹50 Lakh"
+    tender.estimated_value = "50 Lakh"
     tender.source_url = "https://test.gov.in/t/1"
     tender.portal.name = "Test Portal"
     tender.portal.url = "https://test.gov.in"
 
     template = MagicMock(spec=models.Template)
     template.id = 1
-    template.file_path = template_path
+    template.blob_url = "https://blob.vercel-storage.com/templates/template.docx"
     template.file_type = "docx"
 
-    out_path = generate_proposal_file(tender=tender, template=template)
-    assert os.path.exists(out_path)
-    doc = DocxDocument(out_path)
-    text = " ".join(p.text for p in doc.paragraphs)
-    assert "IT Networking" in text
+    fake_blob_url = "https://blob.vercel-storage.com/proposals/proposal_1_1.docx"
 
+    with patch("backend.document.generator.download_blob", return_value=content) as mock_dl, \
+         patch("backend.document.generator.upload_blob", return_value=fake_blob_url) as mock_ul:
+        result_url = generate_proposal(tender=tender, template=template)
 
+    assert result_url == fake_blob_url
+    mock_dl.assert_called_once_with(template.blob_url)
+    # Verify upload was called with the right filename pattern
+    upload_call_args = mock_ul.call_args
+    assert "proposals/proposal_1_1.docx" in upload_call_args[0][1]

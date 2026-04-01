@@ -68,14 +68,15 @@ def test_delete_portal_cascades(client, db_session):
     # Create a proposal linked to that tender
     from backend import models as m
     tmpl = models.Template(
-        name="T", original_filename="t.docx", file_path="/data/t.docx",
+        name="T", original_filename="t.docx",
+        blob_url="https://blob.vercel-storage.com/templates/t.docx",
         file_type="docx", sha256="a" * 64, is_default=False,
     )
     db_session.add(tmpl)
     db_session.commit()
     proposal = models.Proposal(
         tender_id=tender_id, template_id=tmpl.id,
-        file_path="/data/proposals/p.pdf", status="draft",
+        blob_url="https://blob.vercel-storage.com/proposals/p.docx", status="draft",
     )
     db_session.add(proposal)
     db_session.commit()

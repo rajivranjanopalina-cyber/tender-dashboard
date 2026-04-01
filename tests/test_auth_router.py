@@ -23,7 +23,8 @@ def test_login_wrong_password(client):
 
 
 def test_protected_endpoint_without_token(client):
-    resp = client.get("/api/keywords")
+    # Override the default auth header with an empty one to test unauthenticated access
+    resp = client.get("/api/keywords", headers={"Authorization": ""})
     assert resp.status_code == 401
 
 

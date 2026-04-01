@@ -1,15 +1,7 @@
 import os
-import subprocess
 from datetime import date
 from backend import models
-
-
-def _proposals_dir() -> str:
-    """Resolve lazily so DATA_DIR monkeypatching in tests works correctly."""
-    data_dir = os.environ.get("DATA_DIR", "/data")
-    d = os.path.join(data_dir, "proposals")
-    os.makedirs(d, exist_ok=True)
-    return d
+from backend.blob_storage import download_blob, upload_blob
 
 
 PLACEHOLDER_MAP = {
@@ -22,6 +14,9 @@ PLACEHOLDER_MAP = {
     "tender_portal_name": lambda t, p: p.name if p else "",
     "tender_portal_url": lambda t, p: p.url if p else "",
     "generation_date": lambda t, p: str(date.today()),
+    "company_name": lambda t, p: os.environ.get("COMPANY_NAME", ""),
+    "company_address": lambda t, p: os.environ.get("COMPANY_ADDRESS", ""),
+    "company_contact": lambda t, p: os.environ.get("COMPANY_CONTACT", ""),
 }
 
 
@@ -30,50 +25,23 @@ def _build_placeholders(tender: models.Tender) -> dict[str, str]:
     return {key: fn(tender, portal) for key, fn in PLACEHOLDER_MAP.items()}
 
 
-def generate_proposal_file(tender: models.Tender, template: models.Template) -> str:
+def generate_proposal(tender: models.Tender, template: models.Template) -> str:
     """
-    Generate a proposal file from a tender and template.
-    Returns the path to the generated file.
-    Raises OSError on disk full; other exceptions on generation failure.
+    Generate a proposal DOCX from a tender and template.
+    Downloads template from Blob, fills placeholders, uploads result to Blob.
+    Returns the blob_url of the generated proposal.
     """
     placeholders = _build_placeholders(tender)
 
-    with open(template.file_path, "rb") as f:
-        template_bytes = f.read()
+    # Download template from Vercel Blob
+    template_bytes = download_blob(template.blob_url)
 
-    base_name = f"proposal_{tender.id}_{template.id}"
+    # Generate DOCX
+    from backend.document.docx_handler import fill_docx_template
+    output_bytes = fill_docx_template(template_bytes, placeholders)
 
-    if template.file_type == "docx":
-        from backend.document.docx_handler import fill_docx_template
-        out_path = os.path.join(_proposals_dir(), f"{base_name}.docx")
-        fill_docx_template(template_bytes, placeholders, out_path)
+    # Upload generated proposal to Blob
+    filename = f"proposals/proposal_{tender.id}_{template.id}.docx"
+    blob_url = upload_blob(output_bytes, filename)
 
-    elif template.file_type == "pdf":
-        from backend.document.pdf_handler import fill_pdf_template
-        out_path = os.path.join(_proposals_dir(), f"{base_name}.pdf")
-        fill_pdf_template(template_bytes, placeholders, out_path)
-
-    else:
-        raise ValueError(f"Unsupported template type: {template.file_type}")
-
-    return out_path
-
-
-def convert_docx_to_pdf(docx_path: str) -> str | None:
-    """
-    Convert a DOCX file to PDF using LibreOffice headless.
-    Returns the PDF path on success, or None if LibreOffice is unavailable.
-    """
-    out_dir = os.path.dirname(docx_path)
-    try:
-        result = subprocess.run(
-            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", out_dir, docx_path],
-            capture_output=True, timeout=60,
-        )
-        if result.returncode == 0:
-            pdf_path = docx_path.replace(".docx", ".pdf")
-            if os.path.exists(pdf_path):
-                return pdf_path
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
-    return None
+    return blob_url

@@ -1,11 +1,12 @@
-import os
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend import models
 from backend.schemas import ProposalCreate, ProposalOut, ProposalUpdate, PaginatedResponse
+from backend.blob_storage import download_blob, delete_blob
+from backend.document.generator import generate_proposal
 
 router = APIRouter()
 
@@ -17,7 +18,7 @@ def proposal_to_out(p: models.Proposal) -> dict:
         tender_title=p.tender.title if p.tender else "",
         template_id=p.template_id,
         template_name=p.template.name if p.template else None,
-        file_path=p.file_path,
+        blob_url=p.blob_url,
         status=p.status,
         created_at=p.created_at,
         updated_at=p.updated_at,
@@ -60,17 +61,16 @@ def create_proposal(data: ProposalCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=409, detail="A proposal for this tender and template already exists")
 
-    from backend.document.generator import generate_proposal_file
     try:
-        file_path = generate_proposal_file(tender=tender, template=template)
-    except OSError:
-        raise HTTPException(status_code=507, detail="Insufficient storage. Free up space on the data volume.")
+        blob_url = generate_proposal(tender=tender, template=template)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Proposal generation failed: {str(e)}")
 
     proposal = models.Proposal(
-        tender_id=data.tender_id, template_id=data.template_id,
-        file_path=file_path, status="draft",
+        tender_id=data.tender_id,
+        template_id=data.template_id,
+        blob_url=blob_url,
+        status="draft",
     )
     db.add(proposal)
     db.commit()
@@ -94,8 +94,10 @@ def delete_proposal(proposal_id: int, db: Session = Depends(get_db)):
     proposal = db.get(models.Proposal, proposal_id)
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
-    if os.path.exists(proposal.file_path):
-        os.remove(proposal.file_path)
+    try:
+        delete_blob(proposal.blob_url)
+    except Exception:
+        pass  # Best-effort: don't block DB delete if blob deletion fails
     db.delete(proposal)
     db.commit()
 
@@ -105,7 +107,12 @@ def download_proposal(proposal_id: int, db: Session = Depends(get_db)):
     proposal = db.get(models.Proposal, proposal_id)
     if not proposal:
         raise HTTPException(status_code=404, detail="Proposal not found")
-    if not os.path.exists(proposal.file_path):
-        raise HTTPException(status_code=404, detail="Proposal file not found on disk")
-    filename = os.path.basename(proposal.file_path)
-    return FileResponse(proposal.file_path, filename=filename)
+    try:
+        content = download_blob(proposal.blob_url)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Proposal file not found in storage")
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="proposal_{proposal.id}.docx"'},
+    )

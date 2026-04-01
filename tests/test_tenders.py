@@ -93,14 +93,15 @@ def test_delete_tender_with_proposals_blocked(client, db_session):
     portal_id = _create_portal(client)
     tender = _create_tender(db_session, portal_id, "https://t.com/9")
     template = models.Template(
-        name="T", original_filename="t.docx", file_path="/tmp/t.docx",
+        name="T", original_filename="t.docx",
+        blob_url="https://blob.vercel-storage.com/templates/t.docx",
         file_type="docx", sha256="abc", is_default=False,
     )
     db_session.add(template)
     db_session.commit()
     proposal = models.Proposal(
         tender_id=tender.id, template_id=template.id,
-        file_path="/tmp/p.pdf", status="draft",
+        blob_url="https://blob.vercel-storage.com/proposals/p.docx", status="draft",
     )
     db_session.add(proposal)
     db_session.commit()
