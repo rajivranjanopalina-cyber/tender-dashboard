@@ -1,8 +1,15 @@
 import os
 import requests
 
+# Realistic browser User-Agent so government sites don't block requests
+_DEFAULT_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 
-def fetch_html(url: str, renderer: str = "default", timeout: int = 8) -> str:
+
+def fetch_html(url: str, renderer: str = "default", timeout: int = 30) -> str:
     """
     Fetch HTML from a URL.
     renderer="default": uses requests (suitable for server-rendered HTML).
@@ -14,7 +21,15 @@ def fetch_html(url: str, renderer: str = "default", timeout: int = 8) -> str:
 
 
 def _fetch_with_requests(url: str, timeout: int) -> str:
-    response = requests.get(url, timeout=timeout, headers={"User-Agent": "TenderBot/1.0"})
+    response = requests.get(
+        url,
+        timeout=timeout,
+        headers={
+            "User-Agent": _DEFAULT_UA,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+    )
     response.raise_for_status()
     return response.text
 

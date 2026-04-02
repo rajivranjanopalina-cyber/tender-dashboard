@@ -30,7 +30,7 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
         config = json.loads(portal.scrape_config or "{}")
         renderer = config.get("renderer", "default")
 
-        html = fetch_html(portal.url, renderer=renderer, timeout=8)
+        html = fetch_html(portal.url, renderer=renderer)
         raw_tenders = parse_tenders(html, portal.scrape_config or "{}", base_url=portal.url)
 
         # Handle pagination
@@ -46,7 +46,7 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
                 if not next_link or not next_link.get("href", "").strip():
                     break
                 next_url = urljoin(portal.url, next_link.get("href", "").strip())
-                html = fetch_html(next_url, renderer=renderer, timeout=8)
+                html = fetch_html(next_url, renderer=renderer)
                 raw_tenders.extend(parse_tenders(html, portal.scrape_config, base_url=portal.url))
                 page_count += 1
 
