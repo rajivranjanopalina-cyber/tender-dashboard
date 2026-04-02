@@ -20,14 +20,19 @@ def _create_engine():
 
         local_db = os.path.join(tempfile.gettempdir(), "turso_local.db")
 
+        class ConnectionWrapper:
+            """Thin wrapper adding create_function stub for SQLAlchemy compat."""
+            def __init__(self, conn):
+                self._conn = conn
+            def create_function(self, *args, **kwargs):
+                pass  # SQLAlchemy's SQLite dialect needs this for REGEXP
+            def __getattr__(self, name):
+                return getattr(self._conn, name)
+
         def creator():
             conn = libsql.connect(local_db, sync_url=sync_url, auth_token=turso_token)
             conn.sync()
-            # SQLAlchemy's SQLite dialect calls create_function for REGEXP support;
-            # libsql_experimental doesn't implement it, so add a no-op stub.
-            if not hasattr(conn, "create_function"):
-                conn.create_function = lambda *args, **kwargs: None
-            return conn
+            return ConnectionWrapper(conn)
 
         return create_engine("sqlite://", creator=creator)
 
