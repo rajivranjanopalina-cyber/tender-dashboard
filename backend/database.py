@@ -23,6 +23,10 @@ def _create_engine():
         def creator():
             conn = libsql.connect(local_db, sync_url=sync_url, auth_token=turso_token)
             conn.sync()
+            # SQLAlchemy's SQLite dialect calls create_function for REGEXP support;
+            # libsql_experimental doesn't implement it, so add a no-op stub.
+            if not hasattr(conn, "create_function"):
+                conn.create_function = lambda *args, **kwargs: None
             return conn
 
         return create_engine("sqlite://", creator=creator)
