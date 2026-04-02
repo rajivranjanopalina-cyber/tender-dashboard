@@ -45,6 +45,16 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             results["app_import"] = f"FAILED: {traceback.format_exc()}"
 
+        # Test password verification
+        try:
+            import bcrypt
+            pw_hash = os.environ.get("DASHBOARD_PASSWORD_HASH", "")
+            results["pw_hash_prefix"] = pw_hash[:7] if pw_hash else "NOT SET"
+            results["pw_hash_len"] = len(pw_hash)
+            results["pw_verify_12345!"] = bcrypt.checkpw(b"12345!", pw_hash.encode())
+        except Exception as e:
+            results["pw_verify"] = f"FAILED: {e}"
+
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
