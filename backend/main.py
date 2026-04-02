@@ -1,22 +1,8 @@
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
-from backend.database import init_db
 from backend.dependencies import require_auth
 from backend.routers import portals, keywords, tenders, templates, proposals, scraper, auth, health
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_db()
-    yield
-
-
-app = FastAPI(title="Tender Dashboard", lifespan=lifespan)
-
-# Startup event as fallback for serverless environments where lifespan may not run
-@app.on_event("startup")
-def startup_event():
-    init_db()
+app = FastAPI(title="Tender Dashboard")
 
 # Public routes (no auth)
 app.include_router(auth.router, prefix="/api", tags=["auth"])

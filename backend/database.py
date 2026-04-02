@@ -40,19 +40,26 @@ def _create_engine():
 engine = _create_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+_db_initialized = False
+
 
 class Base(DeclarativeBase):
     pass
 
 
+def init_db():
+    global _db_initialized
+    if _db_initialized:
+        return
+    from backend import models  # noqa: F401
+    Base.metadata.create_all(bind=engine)
+    _db_initialized = True
+
+
 def get_db():
+    init_db()  # lazy init on first request (safe for serverless)
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-def init_db():
-    from backend import models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
