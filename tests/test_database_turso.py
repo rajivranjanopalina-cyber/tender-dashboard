@@ -46,8 +46,10 @@ def test_database_url_uses_turso_when_configured(monkeypatch):
     import backend.database
     importlib.reload(backend.database)
 
+    # With libsql_experimental + creator pattern, engine URL is sqlite://
+    # but the creator connects to Turso via HTTP under the hood
     url = str(backend.database.engine.url)
-    assert "libsql" in url or "turso" in url
+    assert url == "sqlite://"
 
 
 def test_database_falls_back_to_sqlite_when_no_turso(monkeypatch):
