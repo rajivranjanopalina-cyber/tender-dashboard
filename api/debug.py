@@ -49,11 +49,18 @@ class handler(BaseHTTPRequestHandler):
         try:
             import bcrypt
             pw_hash = os.environ.get("DASHBOARD_PASSWORD_HASH", "")
-            results["pw_hash_prefix"] = pw_hash[:7] if pw_hash else "NOT SET"
+            pw_hash_stripped = pw_hash.strip()
+            results["pw_hash_repr"] = repr(pw_hash[:20]) + "..." + repr(pw_hash[-10:])
             results["pw_hash_len"] = len(pw_hash)
-            results["pw_verify_12345!"] = bcrypt.checkpw(b"12345!", pw_hash.encode())
+            results["pw_hash_stripped_len"] = len(pw_hash_stripped)
+            # Test with stored hash
+            results["pw_verify_stored"] = bcrypt.checkpw(b"12345!", pw_hash_stripped.encode())
+            # Generate fresh hash on server and verify
+            fresh = bcrypt.hashpw(b"12345!", bcrypt.gensalt())
+            results["pw_verify_fresh"] = bcrypt.checkpw(b"12345!", fresh)
+            results["bcrypt_version"] = bcrypt.__version__
         except Exception as e:
-            results["pw_verify"] = f"FAILED: {e}"
+            results["pw_verify"] = f"FAILED: {traceback.format_exc()}"
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
