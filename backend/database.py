@@ -6,8 +6,8 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 def _get_database_url() -> str:
     """Use Turso if configured, otherwise fall back to local SQLite."""
-    turso_url = os.environ.get("TURSO_DATABASE_URL", "")
-    turso_token = os.environ.get("TURSO_AUTH_TOKEN", "")
+    turso_url = os.environ.get("TURSO_DATABASE_URL", "").strip()
+    turso_token = os.environ.get("TURSO_AUTH_TOKEN", "").strip()
 
     if turso_url and turso_token:
         # turso_url is like "libsql://your-db.turso.io"
