@@ -47,7 +47,7 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
                 if not next_link or not next_link.get("href", "").strip():
                     break
                 next_url = urljoin(portal.url, next_link.get("href", "").strip())
-                html = fetch_html(next_url, renderer=renderer)
+                html = fetch_html(next_url, renderer=renderer, wait_for=wait_for)
                 raw_tenders.extend(parse_tenders(html, portal.scrape_config, base_url=portal.url))
                 page_count += 1
 
