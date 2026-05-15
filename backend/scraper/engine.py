@@ -29,8 +29,9 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
 
         config = json.loads(portal.scrape_config or "{}")
         renderer = config.get("renderer", "default")
+        wait_for = config.get("wait_for", "body")
 
-        html = fetch_html(portal.url, renderer=renderer)
+        html = fetch_html(portal.url, renderer=renderer, wait_for=wait_for)
         raw_tenders = parse_tenders(html, portal.scrape_config or "{}", base_url=portal.url)
 
         # Handle pagination

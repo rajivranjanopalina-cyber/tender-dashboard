@@ -86,3 +86,32 @@ def test_scrape_portal_logs_fetch_error(db_session):
         result = scrape_portal(portal_id=portal.id, db=db_session)
     assert result["status"] == "failed"
     assert "Connection refused" in result["error_message"]
+
+def test_engine_passes_wait_for_to_fetcher(db_session):
+    """scrape_portal must pass wait_for from scrape_config to fetch_html."""
+    config = json.dumps({
+        "renderer": "external",
+        "wait_for": "table.tenders",
+        "list_selector": "tr",
+        "fields": {"title": "td", "source_url": "a@href"},
+    })
+    portal = models.Portal(
+        name="Test Portal WF",
+        url="https://example.com",
+        enabled=True,
+        requires_auth=False,
+        scrape_config=config,
+    )
+    db_session.add(portal)
+    db_session.commit()
+    db_session.refresh(portal)
+
+    with patch("backend.scraper.engine.fetch_html") as mock_fetch:
+        mock_fetch.return_value = "<html><body></body></html>"
+        with patch("backend.scraper.engine.parse_tenders", return_value=[]):
+            result = scrape_portal(portal_id=portal.id, db=db_session)
+
+    mock_fetch.assert_called_once()
+    _, kwargs = mock_fetch.call_args
+    assert kwargs.get("wait_for") == "table.tenders", f"wait_for not passed, got kwargs: {kwargs}"
+    assert kwargs.get("renderer") == "external"
