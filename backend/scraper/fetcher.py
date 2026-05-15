@@ -13,6 +13,7 @@ def fetch_html(
     renderer: str = "default",
     timeout: int = 30,
     wait_for: str = "body",
+    wait_until: str = "load",
 ) -> str:
     """
     Fetch rendered HTML from a URL.
@@ -20,9 +21,12 @@ def fetch_html(
     renderer="default"  — standard requests (server-rendered HTML)
     renderer="insecure" — requests with SSL verification disabled (e.g. Railtel)
     renderer="external" — POST to EXTERNAL_RENDERER_URL/render (Playwright service)
+
+    wait_until only applies to the external renderer:
+      "load" | "domcontentloaded" | "networkidle" | "commit"
     """
     if renderer == "external":
-        return _fetch_with_external_renderer(url, timeout, wait_for)
+        return _fetch_with_external_renderer(url, timeout, wait_for, wait_until)
     if renderer == "insecure":
         return _fetch_with_requests(url, timeout, verify=False)
     return _fetch_with_requests(url, timeout)
@@ -43,13 +47,20 @@ def _fetch_with_requests(url: str, timeout: int, verify: bool = True) -> str:
     return response.text
 
 
-def _fetch_with_external_renderer(url: str, timeout: int, wait_for: str) -> str:
+def _fetch_with_external_renderer(
+    url: str, timeout: int, wait_for: str, wait_until: str = "load"
+) -> str:
     renderer_url = os.environ.get("EXTERNAL_RENDERER_URL", "")
     if not renderer_url:
         raise RuntimeError("EXTERNAL_RENDERER_URL not configured")
     response = requests.post(
         f"{renderer_url}/render",
-        json={"url": url, "wait_for": wait_for, "timeout": timeout * 1000},
+        json={
+            "url": url,
+            "wait_for": wait_for,
+            "timeout": timeout * 1000,
+            "wait_until": wait_until,
+        },
         timeout=timeout + 15,
     )
     response.raise_for_status()
