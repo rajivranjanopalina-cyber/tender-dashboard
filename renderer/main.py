@@ -1,17 +1,30 @@
 import asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, AnyHttpUrl, field_validator
+from pydantic import BaseModel, field_validator
+import render as render_module
 from render import render_url
 
-app = FastAPI(title="Playwright Renderer")
+_sem = asyncio.Semaphore(4)
 
-_sem = asyncio.Semaphore(4)  # cap concurrent renders
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    if render_module._browser is not None:
+        try:
+            await render_module._browser.close()
+        except Exception:
+            pass
+
+
+app = FastAPI(title="Playwright Renderer", lifespan=lifespan)
 
 
 class RenderRequest(BaseModel):
     url: str
     wait_for: str = "body"
-    timeout: int = 30000  # ms
+    timeout: int = 30000
 
     @field_validator("url")
     @classmethod

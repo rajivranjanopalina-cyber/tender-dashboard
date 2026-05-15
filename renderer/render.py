@@ -6,6 +6,11 @@ _browser: Browser | None = None
 async def get_browser() -> Browser:
     global _browser
     if _browser is None or not _browser.is_connected():
+        if _browser is not None:
+            try:
+                await _browser.close()
+            except Exception:
+                pass
         p = await async_playwright().start()
         _browser = await p.chromium.launch(
             headless=True,
