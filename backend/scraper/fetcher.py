@@ -1,7 +1,6 @@
 import os
 import requests
 
-# Realistic browser User-Agent so government sites don't block requests
 _DEFAULT_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -9,21 +8,31 @@ _DEFAULT_UA = (
 )
 
 
-def fetch_html(url: str, renderer: str = "default", timeout: int = 30) -> str:
+def fetch_html(
+    url: str,
+    renderer: str = "default",
+    timeout: int = 30,
+    wait_for: str = "body",
+) -> str:
     """
-    Fetch HTML from a URL.
-    renderer="default": uses requests (suitable for server-rendered HTML).
-    renderer="external": calls EXTERNAL_RENDERER_URL (future, not yet implemented).
+    Fetch rendered HTML from a URL.
+
+    renderer="default"  — standard requests (server-rendered HTML)
+    renderer="insecure" — requests with SSL verification disabled (e.g. Railtel)
+    renderer="external" — POST to EXTERNAL_RENDERER_URL/render (Playwright service)
     """
     if renderer == "external":
-        return _fetch_with_external_renderer(url, timeout)
+        return _fetch_with_external_renderer(url, timeout, wait_for)
+    if renderer == "insecure":
+        return _fetch_with_requests(url, timeout, verify=False)
     return _fetch_with_requests(url, timeout)
 
 
-def _fetch_with_requests(url: str, timeout: int) -> str:
+def _fetch_with_requests(url: str, timeout: int, verify: bool = True) -> str:
     response = requests.get(
         url,
         timeout=timeout,
+        verify=verify,
         headers={
             "User-Agent": _DEFAULT_UA,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -34,15 +43,14 @@ def _fetch_with_requests(url: str, timeout: int) -> str:
     return response.text
 
 
-def _fetch_with_external_renderer(url: str, timeout: int) -> str:
-    """Stub for external JS rendering service. Not implemented yet."""
+def _fetch_with_external_renderer(url: str, timeout: int, wait_for: str) -> str:
     renderer_url = os.environ.get("EXTERNAL_RENDERER_URL", "")
     if not renderer_url:
         raise RuntimeError("EXTERNAL_RENDERER_URL not configured")
     response = requests.post(
-        renderer_url,
-        json={"url": url},
-        timeout=timeout,
+        f"{renderer_url}/render",
+        json={"url": url, "wait_for": wait_for, "timeout": timeout * 1000},
+        timeout=timeout + 15,
     )
     response.raise_for_status()
-    return response.json().get("html", "")
+    return response.json()["html"]
