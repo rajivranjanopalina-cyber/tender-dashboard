@@ -24,7 +24,12 @@ async def get_browser() -> Browser:
     return _browser
 
 
-async def render_url(url: str, wait_for: str = "body", timeout: int = 30000) -> str:
+async def render_url(
+    url: str,
+    wait_for: str = "body",
+    timeout: int = 30000,
+    wait_until: str = "load",
+) -> str:
     browser = await get_browser()
     context = await browser.new_context(
         user_agent=(
@@ -36,7 +41,7 @@ async def render_url(url: str, wait_for: str = "body", timeout: int = 30000) -> 
     )
     try:
         page = await context.new_page()
-        await page.goto(url, wait_until="networkidle", timeout=timeout)
+        await page.goto(url, wait_until=wait_until, timeout=timeout)
         if wait_for and wait_for != "body":
             await page.wait_for_selector(wait_for, timeout=timeout)
         return await page.content()
