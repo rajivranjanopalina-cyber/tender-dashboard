@@ -41,3 +41,12 @@ def test_default_renderer_uses_ssl_verify():
         fetch_html("https://example.com", renderer="default")
         _, kwargs = mock_get.call_args
         assert kwargs.get("verify", True) is True
+
+
+def test_external_renderer_raises_without_env_var():
+    """RuntimeError raised if EXTERNAL_RENDERER_URL is not set."""
+    import os
+    env = {k: v for k, v in os.environ.items() if k != "EXTERNAL_RENDERER_URL"}
+    with patch.dict("os.environ", env, clear=True):
+        with pytest.raises(RuntimeError, match="EXTERNAL_RENDERER_URL"):
+            fetch_html("https://example.com", renderer="external")
