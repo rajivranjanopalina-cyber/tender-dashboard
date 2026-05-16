@@ -1,12 +1,15 @@
 from fastapi import FastAPI, Depends
 from backend.dependencies import require_auth
-from backend.routers import portals, keywords, tenders, templates, proposals, scraper, auth, health
+from backend.routers import portals, keywords, tenders, templates, proposals, scraper, auth, health, cron
 
 app = FastAPI(title="Tender Dashboard")
 
 # Public routes (no auth)
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(health.router, prefix="/api", tags=["health"])
+
+# Cron route — self-authenticating via SCRAPE_SECRET
+app.include_router(cron.router, prefix="/api/cron", tags=["cron"])
 
 # Protected routes (require JWT)
 protected = [
