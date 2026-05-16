@@ -13,7 +13,7 @@ def _require_cron_auth(request: Request) -> None:
     Vercel sends: Authorization: Bearer <CRON_SECRET>
     We reuse SCRAPE_SECRET as the cron secret to keep env vars minimal.
     """
-    secret = os.environ.get("SCRAPE_SECRET", "")
+    secret = os.environ.get("SCRAPE_SECRET", "").strip()
     if not secret:
         raise HTTPException(status_code=500, detail="SCRAPE_SECRET not configured")
 
