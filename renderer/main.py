@@ -29,6 +29,8 @@ class RenderRequest(BaseModel):
     wait_for: str = "body"
     timeout: int = 30000
     wait_until: str = "load"
+    click_selector: str = ""
+    click_wait_for: str = ""
 
     @field_validator("url")
     @classmethod
@@ -54,7 +56,7 @@ def health():
 async def render(req: RenderRequest):
     async with _sem:
         try:
-            html = await render_url(req.url, req.wait_for, req.timeout, req.wait_until)
+            html = await render_url(req.url, req.wait_for, req.timeout, req.wait_until, req.click_selector, req.click_wait_for)
             return {"html": html}
         except Exception as exc:
             raise HTTPException(status_code=500, detail=str(exc))

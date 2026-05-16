@@ -31,8 +31,17 @@ def scrape_portal(portal_id: int, db: Session) -> dict:
         renderer = config.get("renderer", "default")
         wait_for = config.get("wait_for", "body")
         wait_until = config.get("wait_until", "load")
+        click_selector = config.get("click_selector", "")
+        click_wait_for = config.get("click_wait_for", "")
 
-        html = fetch_html(portal.url, renderer=renderer, wait_for=wait_for, wait_until=wait_until)
+        html = fetch_html(
+            portal.url,
+            renderer=renderer,
+            wait_for=wait_for,
+            wait_until=wait_until,
+            click_selector=click_selector,
+            click_wait_for=click_wait_for,
+        )
         raw_tenders = parse_tenders(html, portal.scrape_config or "{}", base_url=portal.url)
 
         # Handle pagination

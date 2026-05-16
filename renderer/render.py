@@ -29,6 +29,8 @@ async def render_url(
     wait_for: str = "body",
     timeout: int = 30000,
     wait_until: str = "load",
+    click_selector: str = "",
+    click_wait_for: str = "",
 ) -> str:
     browser = await get_browser()
     context = await browser.new_context(
@@ -44,6 +46,13 @@ async def render_url(
         await page.goto(url, wait_until=wait_until, timeout=timeout)
         if wait_for and wait_for != "body":
             await page.wait_for_selector(wait_for, timeout=timeout)
+        # Optional: click a button (e.g. Search) and wait for results to load
+        if click_selector:
+            await page.click(click_selector, timeout=timeout)
+            if click_wait_for:
+                await page.wait_for_selector(click_wait_for, timeout=timeout)
+            else:
+                await page.wait_for_load_state("networkidle", timeout=timeout)
         return await page.content()
     finally:
         await context.close()
