@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const pollRef = useRef(null);
-  const PAGE_SIZE = 50;
+  const PAGE_SIZE = 10;
 
   const load = async () => {
     setLoading(true);
@@ -130,38 +130,59 @@ export default function Dashboard() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select value={filters.status} onChange={e => { setFilters(f => ({ ...f, status: e.target.value })); setPage(1); }}>
-          <option value="">All Statuses</option>
-          <option value="new">New</option>
-          <option value="under_review">Under Review</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-        <select value={filters.portal_id} onChange={e => { setFilters(f => ({ ...f, portal_id: e.target.value })); setPage(1); }}>
-          <option value="">All Portals</option>
-          {portals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
-        <input
-          placeholder="Filter by keyword..."
-          value={filters.keyword}
-          onChange={e => { setFilters(f => ({ ...f, keyword: e.target.value })); setPage(1); }}
-        />
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={e => { setFilters(f => ({ ...f, date_from: e.target.value })); setPage(1); }}
-          title="From date"
-          style={{ background: '#1e1e2e', border: '1px solid #333', color: '#e0e0e0', borderRadius: 4, padding: '4px 8px' }}
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={e => { setFilters(f => ({ ...f, date_to: e.target.value })); setPage(1); }}
-          title="To date"
-          style={{ background: '#1e1e2e', border: '1px solid #333', color: '#e0e0e0', borderRadius: 4, padding: '4px 8px' }}
-        />
-      </div>
+      {(() => {
+        const hasFilter = filters.status || filters.keyword || filters.portal_id || filters.date_from || filters.date_to;
+        return (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <select value={filters.status} onChange={e => { setFilters(f => ({ ...f, status: e.target.value })); setPage(1); }}>
+                <option value="">All Statuses</option>
+                <option value="new">New</option>
+                <option value="under_review">Under Review</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <select value={filters.portal_id} onChange={e => { setFilters(f => ({ ...f, portal_id: e.target.value })); setPage(1); }}>
+                <option value="">All Portals</option>
+                {portals.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <input
+                placeholder="Search title, description, keyword..."
+                value={filters.keyword}
+                onChange={e => { setFilters(f => ({ ...f, keyword: e.target.value })); setPage(1); }}
+                style={{ minWidth: 220 }}
+              />
+              <input
+                type="date"
+                value={filters.date_from}
+                onChange={e => { setFilters(f => ({ ...f, date_from: e.target.value })); setPage(1); }}
+                title="Deadline from"
+                style={{ background: '#1e1e2e', border: '1px solid #333', color: '#e0e0e0', borderRadius: 4, padding: '4px 8px' }}
+              />
+              <input
+                type="date"
+                value={filters.date_to}
+                onChange={e => { setFilters(f => ({ ...f, date_to: e.target.value })); setPage(1); }}
+                title="Deadline to"
+                style={{ background: '#1e1e2e', border: '1px solid #333', color: '#e0e0e0', borderRadius: 4, padding: '4px 8px' }}
+              />
+              {hasFilter && (
+                <button
+                  onClick={() => { setFilters({ status: '', keyword: '', portal_id: '', date_from: '', date_to: '' }); setPage(1); }}
+                  style={{ background: '#333', border: '1px solid #555', color: '#e0e0e0', borderRadius: 4, padding: '4px 12px', cursor: 'pointer', fontSize: 13 }}
+                >
+                  ✕ Clear Filters
+                </button>
+              )}
+            </div>
+            {hasFilter && (
+              <div style={{ marginTop: 8, fontSize: 12, color: '#888' }}>
+                Filters active — showing {total} matching result{total !== 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {loading && <div style={{ color: '#888', marginBottom: 12 }}>Loading...</div>}
 
@@ -200,7 +221,15 @@ export default function Dashboard() {
       </table>
 
       {!loading && tenders.length === 0 && (
-        <div style={{ textAlign: 'center', color: '#555', padding: '2rem' }}>No tenders found.</div>
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#666' }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>🔍</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#aaa', marginBottom: 6 }}>No Record Found</div>
+          <div style={{ fontSize: 13, color: '#555' }}>
+            {filters.status || filters.keyword || filters.portal_id || filters.date_from || filters.date_to
+              ? 'No tenders match the current filters. Try adjusting or clearing the filters.'
+              : 'No tenders have been scraped yet. Run a scrape to populate the list.'}
+          </div>
+        </div>
       )}
 
       {/* Pagination */}

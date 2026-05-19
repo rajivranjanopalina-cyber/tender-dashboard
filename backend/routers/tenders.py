@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend import models
@@ -54,8 +55,13 @@ def list_tenders(
     if scraped_from:
         q = q.filter(models.Tender.scraped_at >= scraped_from)
     if keyword:
-        # Filter tenders where matched_keywords JSON array contains the keyword (case-insensitive)
-        q = q.filter(models.Tender.matched_keywords.ilike(f'%"{keyword}"%'))
+        # Search keyword in title, description, and matched_keywords (case-insensitive)
+        kw = f"%{keyword}%"
+        q = q.filter(or_(
+            models.Tender.title.ilike(kw),
+            models.Tender.description.ilike(kw),
+            models.Tender.matched_keywords.ilike(kw),
+        ))
     total = q.count()
     items = q.offset((page - 1) * page_size).limit(page_size).all()
     return PaginatedResponse(items=[tender_to_out(t) for t in items], total=total, page=page, page_size=page_size)
